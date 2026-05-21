@@ -26,7 +26,7 @@ LANG_DICT: dict[str, dict[str, str]] = {
     "PT": {
         # Sidebar
         "sidebar_title":          "🛒 Meli Trends",
-        "sidebar_caption":        "Desenvolvido com a API do Mercado Livre",
+        "sidebar_caption":        "Desenvolvido com a API do Mercado Livre by Bariza.dev",
         "auth_header":            "🔐 Autenticação",
         "auth_step1":             "**Passo 1.** Clique no link abaixo para autorizar o app no seu navegador:",
         "auth_link":              "🔗 Autorizar no Mercado Livre",
@@ -170,6 +170,35 @@ with st.sidebar:
     st.caption(T["sidebar_caption"])
     st.divider()
 
+# ── Category selector ─────────────────────────────────────────────────────
+    st.subheader(T["category_header"])
+
+    @st.cache_data(ttl=3600, show_spinner="Loading categories…")
+    def load_categories() -> list[dict]:
+        return mc.fetch_categories()
+
+    try:
+        categories = load_categories()
+    except HTTPError as exc:
+        st.error(f"Could not load categories: {exc}")
+        st.stop()
+    except Exception as exc:  # noqa: BLE001
+        st.error(f"Unexpected error loading categories: {exc}")
+        st.stop()
+
+    category_map: dict[str, str] = {cat["name"]: cat["id"] for cat in categories}
+    selected_name = st.selectbox(
+        T["category_select_label"],
+        options=list(category_map.keys()),
+        index=0,
+        label_visibility="collapsed",
+    )
+    selected_id: str = category_map[selected_name]
+
+    st.caption(f"Category ID: `{selected_id}`")
+
+    st.divider()
+
     # ── Auth section ─────────────────────────────────────────────────────────
     st.subheader(T["auth_header"])
 
@@ -222,35 +251,6 @@ with st.sidebar:
                         )
                     except Exception as exc:  # noqa: BLE001
                         st.error(f"Unexpected error: {exc}")
-
-    st.divider()
-
-    # ── Category selector ─────────────────────────────────────────────────────
-    st.subheader(T["category_header"])
-
-    @st.cache_data(ttl=3600, show_spinner="Loading categories…")
-    def load_categories() -> list[dict]:
-        return mc.fetch_categories()
-
-    try:
-        categories = load_categories()
-    except HTTPError as exc:
-        st.error(f"Could not load categories: {exc}")
-        st.stop()
-    except Exception as exc:  # noqa: BLE001
-        st.error(f"Unexpected error loading categories: {exc}")
-        st.stop()
-
-    category_map: dict[str, str] = {cat["name"]: cat["id"] for cat in categories}
-    selected_name = st.selectbox(
-        T["category_select_label"],
-        options=list(category_map.keys()),
-        index=0,
-        label_visibility="collapsed",
-    )
-    selected_id: str = category_map[selected_name]
-
-    st.caption(f"Category ID: `{selected_id}`")
 
 # ---------------------------------------------------------------------------
 # Helper — data processing
