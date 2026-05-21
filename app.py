@@ -19,6 +19,103 @@ import db_client as db
 import meli_client as mc
 
 # ---------------------------------------------------------------------------
+# i18n — translations dictionary
+# ---------------------------------------------------------------------------
+
+LANG_DICT: dict[str, dict[str, str]] = {
+    "PT": {
+        # Sidebar
+        "sidebar_title":          "🛒 Meli Trends",
+        "sidebar_caption":        "Desenvolvido com a API do Mercado Livre",
+        "auth_header":            "🔐 Autenticação",
+        "auth_step1":             "**Passo 1.** Clique no link abaixo para autorizar o app no seu navegador:",
+        "auth_link":              "🔗 Autorizar no Mercado Livre",
+        "auth_step2_pre":         "**Passo 2.** Após autorizar, você será redirecionado para",
+        "auth_code_placeholder":  "Cole seu código aqui…",
+        "auth_button":            "🔑 Trocar pelo Access Token",
+        "auth_paste_warning":     "Por favor, cole o código de autorização primeiro.",
+        "auth_success":           "Token obtido com sucesso!",
+        "auth_signout":           "Sair",
+        "auth_authenticated":     "Autenticado ✅",
+        "category_header":        "📂 Categoria",
+        "category_select_label":  "Selecione uma categoria",
+        # Main area
+        "page_title":             "📈 Meli Trends",
+        "page_subtitle":          "Exibindo as buscas mais populares no **Mercado Livre Brasil** para",
+        "trends_header":          "🔥 Top Tendências",
+        "chart_header":           "📊 Ranking de Tendências",
+        "chart_caption":          "Comprimento da barra = rank inverso (keyword #1 = barra maior). Volume real não é exposto por este endpoint.",
+        "col_rank":               "Rank",
+        "col_keyword":            "Keyword",
+        "col_link":               "Link",
+        "link_open":              "Abrir ↗",
+        "sellers_header":         "🛍️ Destaque: Mais Vendidos",
+        "sellers_caption":        "Produtos mais vendidos no Mercado Livre para **{category}** · API de Destaques · Cache 15 min.",
+        "sellers_no_data":        "Nenhum dado de mais vendidos para esta categoria. Tente **Tecnologia**, **Celulares** ou **Moda**.",
+        "sellers_link":           "🛒 Ver no Mercado Livre",
+        "history_expander":       "🕐 Dados Históricos — Veja a evolução das tendências ao longo do tempo",
+        "history_no_db":          "Banco de dados indisponível. Configure `DATABASE_URL` no seu arquivo `.env`.",
+        "history_no_data":        "Nenhum dado histórico ainda para esta categoria. Snapshots são salvos automaticamente a cada carregamento.",
+        "history_metric_rows":    "Total de linhas salvas",
+        "history_metric_snaps":   "Snapshots capturados",
+        "history_metric_since":   "Rastreando desde",
+        "history_raw_header":     "##### Log de snapshots brutos",
+        "history_chart_header":   "##### Rank ao longo do tempo — top keywords",
+        "history_chart_caption":  "Rank menor = mais popular. Cada ponto é um snapshot.",
+        "history_slider_label":   "Keywords a exibir",
+        "history_need_more":      "Volte após mais alguns recarregamentos para ver o gráfico de rank ao longo do tempo (precisa de ≥ 2 snapshots).",
+        "col_captured_at":        "Capturado em (UTC)",
+        "footer_caption":         "Dados da [API de Tendências do Mercado Livre](https://developers.mercadolivre.com.br). Scores derivados do ranking de keywords — volume real não disponível por este endpoint.",
+        "no_trends":              "Nenhuma tendência encontrada para esta categoria.",
+    },
+    "EN": {
+        # Sidebar
+        "sidebar_title":          "🛒 Meli Trends",
+        "sidebar_caption":        "Powered by the Mercado Livre API",
+        "auth_header":            "🔐 Authentication",
+        "auth_step1":             "**Step 1.** Click the link below to authorize the app in your browser:",
+        "auth_link":              "🔗 Authorize on Mercado Livre",
+        "auth_step2_pre":         "**Step 2.** After authorizing, you'll be redirected to",
+        "auth_code_placeholder":  "Paste your code here…",
+        "auth_button":            "🔑 Exchange for Access Token",
+        "auth_paste_warning":     "Please paste the authorization code first.",
+        "auth_success":           "Token obtained successfully!",
+        "auth_signout":           "Sign out",
+        "auth_authenticated":     "Authenticated ✅",
+        "category_header":        "📂 Category",
+        "category_select_label":  "Select a category",
+        # Main area
+        "page_title":             "📈 Meli Trends",
+        "page_subtitle":          "Showing top trending searches on **Mercado Livre Brazil** for",
+        "trends_header":          "🔥 Top Trends",
+        "chart_header":           "📊 Trend Ranking",
+        "chart_caption":          "Bar length = inverse rank (top keyword = longest bar). Quantitative volume data is not exposed by this endpoint.",
+        "col_rank":               "Rank",
+        "col_keyword":            "Keyword",
+        "col_link":               "Link",
+        "link_open":              "Open ↗",
+        "sellers_header":         "🛍️ Deep Dive: Top Sellers",
+        "sellers_caption":        "Best-selling products on Mercado Livre for **{category}** · Highlights API · Cached 15 min.",
+        "sellers_no_data":        "No best-seller data for this category. Try **Technology**, **Phones** or **Fashion**.",
+        "sellers_link":           "🛒 View on Mercado Livre",
+        "history_expander":       "🕐 Historical Data — See trend evolution over time",
+        "history_no_db":          "Database is not available. Configure `DATABASE_URL` in your `.env` file.",
+        "history_no_data":        "No historical data yet for this category. Snapshots are saved automatically each time you load this page.",
+        "history_metric_rows":    "Total rows stored",
+        "history_metric_snaps":   "Snapshots captured",
+        "history_metric_since":   "Tracking since",
+        "history_raw_header":     "##### Raw snapshot log",
+        "history_chart_header":   "##### Rank over time — top keywords",
+        "history_chart_caption":  "Lower rank = more popular. Each point is one captured snapshot.",
+        "history_slider_label":   "Keywords to display",
+        "history_need_more":      "Come back after a few more refreshes to see the rank-over-time chart (needs ≥ 2 snapshots).",
+        "col_captured_at":        "Captured At (UTC)",
+        "footer_caption":         "Data sourced from the [Mercado Livre Trends API](https://developers.mercadolivre.com.br). Trend scores are derived from keyword ranking — actual search volume is not available via this endpoint.",
+        "no_trends":              "No trends found for this category.",
+    },
+}
+
+# ---------------------------------------------------------------------------
 # DB initialization (runs once per Streamlit process)
 # ---------------------------------------------------------------------------
 
@@ -60,17 +157,26 @@ if "token_info" not in st.session_state:
 # ---------------------------------------------------------------------------
 
 with st.sidebar:
-    st.title("🛒 Meli Trends")
-    st.caption("Powered by the Mercado Livre API")
+    # ── Language selector (must be first so all subsequent strings use it) ────
+    lang: str = st.selectbox(
+        "🌍 Language / Idioma",
+        options=["PT", "EN"],
+        index=0,
+        key="lang_select",
+    )
+    T = LANG_DICT[lang]  # shorthand — T["key"] throughout the file
+
+    st.title(T["sidebar_title"])
+    st.caption(T["sidebar_caption"])
     st.divider()
 
     # ── Auth section ─────────────────────────────────────────────────────────
-    st.subheader("🔐 Authentication")
+    st.subheader(T["auth_header"])
 
     if st.session_state.access_token:
         user_id = st.session_state.token_info.get("user_id", "—")
-        st.success(f"Authenticated ✅\n\nUser ID: `{user_id}`")
-        if st.button("Sign out", use_container_width=True):
+        st.success(f"{T['auth_authenticated']}\n\nUser ID: `{user_id}`")
+        if st.button(T["auth_signout"], use_container_width=True):
             st.session_state.access_token = None
             st.session_state.token_info = {}
             st.rerun()
@@ -78,30 +184,27 @@ with st.sidebar:
         # Step 1 — Generate and display the authorization URL
         try:
             auth_url = mc.get_authorization_url()
-            st.markdown(
-                "**Step 1.** Click the link below to authorize the app in your "
-                "browser:"
-            )
-            st.markdown(f"[🔗 Authorize on Mercado Livre]({auth_url})")
+            st.markdown(T["auth_step1"])
+            st.markdown(f"[{T['auth_link']}]({auth_url})")
         except ValueError as exc:
             st.error(f"Configuration error: {exc}")
             st.stop()
 
         # Step 2 — Paste the code from the redirect URL
         st.markdown(
-            "**Step 2.** After authorizing, you'll be redirected to "
-            f"`{mc.REDIRECT_URI}?code=...`. Copy the `code` value and paste "
-            "it below:"
+            f"{T['auth_step2_pre']} "
+            f"`{mc.REDIRECT_URI}?code=...`. "
+            + ("Cole o valor de `code` abaixo:" if lang == "PT" else "Copy the `code` value and paste it below:")
         )
         auth_code = st.text_input(
             "Authorization code",
-            placeholder="Paste your code here…",
+            placeholder=T["auth_code_placeholder"],
             label_visibility="collapsed",
         )
 
-        if st.button("🔑 Exchange for Access Token", use_container_width=True):
+        if st.button(T["auth_button"], use_container_width=True):
             if not auth_code.strip():
-                st.warning("Please paste the authorization code first.")
+                st.warning(T["auth_paste_warning"])
             else:
                 with st.spinner("Exchanging code for token…"):
                     try:
@@ -110,7 +213,7 @@ with st.sidebar:
                         )
                         st.session_state.access_token = token_data["access_token"]
                         st.session_state.token_info = token_data
-                        st.success("Token obtained successfully!")
+                        st.success(T["auth_success"])
                         st.rerun()
                     except HTTPError as exc:
                         st.error(
@@ -123,7 +226,7 @@ with st.sidebar:
     st.divider()
 
     # ── Category selector ─────────────────────────────────────────────────────
-    st.subheader("📂 Category")
+    st.subheader(T["category_header"])
 
     @st.cache_data(ttl=3600, show_spinner="Loading categories…")
     def load_categories() -> list[dict]:
@@ -140,7 +243,7 @@ with st.sidebar:
 
     category_map: dict[str, str] = {cat["name"]: cat["id"] for cat in categories}
     selected_name = st.selectbox(
-        "Select a category",
+        T["category_select_label"],
         options=list(category_map.keys()),
         index=0,
         label_visibility="collapsed",
@@ -205,11 +308,31 @@ def _persist_trends(category_id: str, df: pd.DataFrame) -> None:
 # Main area
 # ---------------------------------------------------------------------------
 
-st.title("📈 Meli Trends")
+# ── Global CSS injection ──────────────────────────────────────────────────────
 st.markdown(
-    f"Showing top trending searches on **Mercado Livre Brazil** for "
-    f"**{selected_name}**."
+    """
+    <style>
+    /* Uniform product card images */
+    [data-testid="stImage"] img {
+        height: 200px;
+        object-fit: contain;
+        background-color: #f9f9f9;
+        border-radius: 10px;
+        padding: 5px;
+    }
+    /* Flex column layout so cards align even with varying title lengths */
+    .stColumn {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
+
+st.title(T["page_title"])
+st.markdown(f"{T['page_subtitle']} **{selected_name}**.")
 st.divider()
 
 # ── Fetch & display trends ────────────────────────────────────────────────────
@@ -239,14 +362,14 @@ if st.session_state.last_persisted.get(_persist_key) is None:
     st.session_state.last_persisted[_persist_key] = True
 
 if df_trends.empty:
-    st.info("No trends found for this category.")
+    st.info(T["no_trends"])
     st.stop()
 
 # ── Layout — two columns ──────────────────────────────────────────────────────
 col_table, col_chart = st.columns([1.2, 1], gap="large")
 
 with col_table:
-    st.subheader(f"🔥 Top {len(df_trends)} Trends")
+    st.subheader(f"{T['trends_header']} ({len(df_trends)})")
 
     # Display columns: always show rank + keyword; show url only if present
     display_cols = ["rank", "keyword"]
@@ -258,12 +381,12 @@ with col_table:
         use_container_width=True,
         hide_index=True,
         column_config={
-            "rank": st.column_config.NumberColumn("Rank", width="small"),
-            "keyword": st.column_config.TextColumn("Keyword", width="large"),
+            "rank": st.column_config.NumberColumn(T["col_rank"], width="small"),
+            "keyword": st.column_config.TextColumn(T["col_keyword"], width="large"),
             **(
                 {
                     "url": st.column_config.LinkColumn(
-                        "Link", display_text="Open ↗", width="small"
+                        T["col_link"], display_text=T["link_open"], width="small"
                     )
                 }
                 if "url" in df_trends.columns
@@ -273,11 +396,8 @@ with col_table:
     )
 
 with col_chart:
-    st.subheader("📊 Trend Ranking")
-    st.caption(
-        "Bar length = inverse rank (top keyword = longest bar). "
-        "Quantitative volume data is not exposed by this endpoint."
-    )
+    st.subheader(T["chart_header"])
+    st.caption(T["chart_caption"])
 
     # Build a simple score based on inverse rank so the chart is meaningful
     chart_df = (
@@ -291,11 +411,8 @@ with col_chart:
 
 # ── Deep Dive: Top Sellers ────────────────────────────────────────────────────
 st.divider()
-st.subheader("🛍️ Deep Dive: Top Sellers")
-st.caption(
-    f"Best-selling products on Mercado Livre for **{selected_name}** · "
-    "Sourced from the Highlights API · Cached 15 min."
-)
+st.subheader(T["sellers_header"])
+st.caption(T["sellers_caption"].format(category=selected_name))
 
 
 @st.cache_data(ttl=900, show_spinner="Loading top sellers…")
@@ -327,15 +444,12 @@ except Exception as exc:  # noqa: BLE001
     highlights = []
 
 if not highlights:
-    st.info(
-        "No best-seller data available for this category. "
-        "Try selecting a high-traffic category such as **Tecnologia** or **Moda**."
-    )
+    st.info(T["sellers_no_data"])
 else:
     prod_cols = st.columns(len(highlights), gap="large")
     for col, product in zip(prod_cols, highlights):
         with col:
-            # ── Product image ────────────────────────────────────────────────
+            # ── Product image (CSS ensures uniform 200px height) ──────────────
             if product["thumbnail"]:
                 st.image(product["thumbnail"], use_container_width=True)
 
@@ -353,15 +467,15 @@ else:
             # ── Permalink ────────────────────────────────────────────────────
             if product["permalink"]:
                 st.markdown(
-                    f"[🛒 Ver no Mercado Livre]({product['permalink']})",
+                    f"[{T['sellers_link']}]({product['permalink']})",
                     unsafe_allow_html=False,
                 )
 
 # ── Historical data ───────────────────────────────────────────────────────────
 st.divider()
-with st.expander("🕐 Historical Data — See trend evolution over time", expanded=False):
+with st.expander(T["history_expander"], expanded=False):
     if not _db_ready:
-        st.warning("Database is not available. Configure `DATABASE_URL` in your `.env` file.")
+        st.warning(T["history_no_db"])
     else:
         @st.cache_data(ttl=60, show_spinner="Loading history…")
         def load_history(category_id: str) -> pd.DataFrame:
@@ -374,39 +488,38 @@ with st.expander("🕐 Historical Data — See trend evolution over time", expan
         df_history = load_history(selected_id)
 
         if df_history.empty:
-            st.info(
-                "No historical data yet for this category. Snapshots are saved "
-                "automatically each time you load this page."
-            )
+            st.info(T["history_no_data"])
         else:
             total_snapshots = df_history["created_at"].nunique()
             first_seen = df_history["created_at"].min()
-            last_seen = df_history["created_at"].max()
 
             m1, m2, m3 = st.columns(3)
-            m1.metric("Total rows stored", f"{len(df_history):,}")
-            m2.metric("Snapshots captured", total_snapshots)
-            m3.metric("Tracking since", first_seen.strftime("%Y-%m-%d %H:%M UTC") if pd.notna(first_seen) else "—")
+            m1.metric(T["history_metric_rows"], f"{len(df_history):,}")
+            m2.metric(T["history_metric_snaps"], total_snapshots)
+            m3.metric(
+                T["history_metric_since"],
+                first_seen.strftime("%Y-%m-%d %H:%M UTC") if pd.notna(first_seen) else "—",
+            )
 
-            st.markdown("##### Raw snapshot log")
+            st.markdown(T["history_raw_header"])
             st.dataframe(
                 df_history[["created_at", "rank", "keyword"]],
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    "created_at": st.column_config.DatetimeColumn("Captured At (UTC)", format="YYYY-MM-DD HH:mm"),
-                    "rank": st.column_config.NumberColumn("Rank", width="small"),
-                    "keyword": st.column_config.TextColumn("Keyword"),
+                    "created_at": st.column_config.DatetimeColumn(
+                        T["col_captured_at"], format="YYYY-MM-DD HH:mm"
+                    ),
+                    "rank": st.column_config.NumberColumn(T["col_rank"], width="small"),
+                    "keyword": st.column_config.TextColumn(T["col_keyword"]),
                 },
             )
 
             if total_snapshots >= 2:
-                st.markdown("##### Rank over time — top 10 keywords")
-                st.caption(
-                    "Lower rank = more popular. Each point is one captured snapshot."
-                )
+                st.markdown(T["history_chart_header"])
+                st.caption(T["history_chart_caption"])
                 top_n_slider = st.slider(
-                    "Keywords to display", min_value=3, max_value=20, value=10, step=1
+                    T["history_slider_label"], min_value=3, max_value=20, value=10, step=1
                 )
                 df_rot = load_rank_over_time(selected_id, top_n_slider)
                 if not df_rot.empty:
@@ -419,17 +532,16 @@ with st.expander("🕐 Historical Data — See trend evolution over time", expan
                         )
                         .sort_index()
                     )
-                    # Invert rank so that rank=1 appears at the top of the chart
-                    max_rank = pivot.max().max()
-                    pivot_inverted = (max_rank - pivot + 1).fillna(method="ffill")  # type: ignore[arg-type]
+                    # Fix 1: coerce all values to numeric (handles mixed types)
+                    pivot = pivot.apply(pd.to_numeric, errors="coerce")
+                    # Fix 2: safe max — guard against all-NaN pivot
+                    max_rank = pivot.max().max() if not pivot.empty else 10
+                    # Fix 3: modern ffill() — no deprecated fillna(method=...) call
+                    pivot_inverted = (max_rank - pivot + 1).ffill()
                     st.line_chart(pivot_inverted, use_container_width=True)
             else:
-                st.info("Come back after a few more refreshes to see the rank-over-time chart (needs ≥ 2 snapshots).")
+                st.info(T["history_need_more"])
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.divider()
-st.caption(
-    "Data sourced from the [Mercado Livre Trends API](https://developers.mercadolivre.com.br). "
-    "Trend scores are derived from keyword ranking — actual search volume is not available "
-    "via this endpoint."
-)
+st.caption(T["footer_caption"])
