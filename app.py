@@ -67,11 +67,16 @@ LANG_DICT: dict[str, dict[str, str]] = {
         "col_captured_at":        "Capturado em (UTC)",
         "footer_caption":         "Dados da [API de Tendências do Mercado Livre](https://developers.mercadolivre.com.br). Scores derivados do ranking de keywords — volume real não disponível por este endpoint.",
         "no_trends":              "Nenhuma tendência encontrada para esta categoria.",
+        # Tooltips — value-added context for each data view
+        "tooltip_top_trends":     "Foco na descoberta: identifique sinais de mercado. Veja as buscas que mais crescem para antecipar demanda e tendências.",
+        "tooltip_ranking":        "Visualize a intensidade do interesse: entenda a concentração de mercado. Ideal para priorizar palavras-chave em estratégias de SEO e anúncios.",
+        "tooltip_top_sellers":    "Benchmark competitivo: analise líderes de vendas. Compare posicionamento e otimize suas listagens para maior conversão.",
+        "tooltip_history":        "Valide padrões ao longo do tempo: detecte sazonalidade e tendências de longo prazo para embasar previsões e estoque.",
     },
     "EN": {
         # Sidebar
         "sidebar_title":          "🛒 Meli Trends",
-        "sidebar_caption":        "Powered by the Mercado Livre API",
+        "sidebar_caption":        "Powered by the Mercado Livre API by Bariza.dev",
         "auth_header":            "🔐 Authentication",
         "auth_step1":             "**Step 1.** Click the link below to authorize the app in your browser:",
         "auth_link":              "🔗 Authorize on Mercado Livre",
@@ -112,6 +117,11 @@ LANG_DICT: dict[str, dict[str, str]] = {
         "col_captured_at":        "Captured At (UTC)",
         "footer_caption":         "Data sourced from the [Mercado Livre Trends API](https://developers.mercadolivre.com.br). Trend scores are derived from keyword ranking — actual search volume is not available via this endpoint.",
         "no_trends":              "No trends found for this category.",
+        # Tooltips — value-added context for each data view
+        "tooltip_top_trends":     "Focus on discovery: identify strong market signals. See the fastest-growing searches to anticipate demand and emerging trends.",
+        "tooltip_ranking":        "Visualize interest intensity: understand market concentration. Ideal for prioritizing keywords in your SEO and ad strategies.",
+        "tooltip_top_sellers":    "Competitive benchmarking: analyze top-selling products. Compare positioning and optimize your own listings for higher conversion.",
+        "tooltip_history":        "Validate patterns over time: detect seasonality and long-term trends to support better forecasting and inventory decisions.",
     },
 }
 
@@ -168,7 +178,6 @@ with st.sidebar:
 
     st.title(T["sidebar_title"])
     st.caption(T["sidebar_caption"])
-    st.divider()
 
 # ── Category selector ─────────────────────────────────────────────────────
     st.subheader(T["category_header"])
@@ -369,7 +378,10 @@ if df_trends.empty:
 col_table, col_chart = st.columns([1.2, 1], gap="large")
 
 with col_table:
-    st.subheader(f"{T['trends_header']} ({len(df_trends)})")
+    st.subheader(
+        f"{T['trends_header']} ({len(df_trends)})",
+        help=T["tooltip_top_trends"]
+    )
 
     # Display columns: always show rank + keyword; show url only if present
     display_cols = ["rank", "keyword"]
@@ -396,7 +408,7 @@ with col_table:
     )
 
 with col_chart:
-    st.subheader(T["chart_header"])
+    st.subheader(T["chart_header"], help=T["tooltip_ranking"])
     st.caption(T["chart_caption"])
 
     # Build a simple score based on inverse rank so the chart is meaningful
@@ -411,7 +423,7 @@ with col_chart:
 
 # ── Deep Dive: Top Sellers ────────────────────────────────────────────────────
 st.divider()
-st.subheader(T["sellers_header"])
+st.subheader(T["sellers_header"], help=T["tooltip_top_sellers"])
 st.caption(T["sellers_caption"].format(category=selected_name))
 
 
@@ -495,7 +507,7 @@ with st.expander(T["history_expander"], expanded=False):
 
             m1, m2, m3 = st.columns(3)
             m1.metric(T["history_metric_rows"], f"{len(df_history):,}")
-            m2.metric(T["history_metric_snaps"], total_snapshots)
+            m2.metric(T["history_metric_snaps"], total_snapshots, help=T["tooltip_history"])
             m3.metric(
                 T["history_metric_since"],
                 first_seen.strftime("%Y-%m-%d %H:%M UTC") if pd.notna(first_seen) else "—",
