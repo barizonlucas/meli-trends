@@ -4,9 +4,10 @@ meli_client.py
 Handles all interactions with the Mercado Livre API:
   - OAuth 2.0 authorization URL generation
   - Authorization code exchange for access_token
+  - App-level token (client credentials) for unauthenticated browsing
   - Category listing
   - Trend fetching per category
-  - Product search / enrichment per keyword
+  - Category highlight products (Best Sellers via Highlights + Multi-get Items)
 """
 
 import os
@@ -104,22 +105,20 @@ def exchange_code_for_token(code: str) -> dict:
 def get_app_token() -> str:
     """Obtain a short-lived app-level access token via the client credentials grant.
 
-    This token is sufficient for read-only public API calls (categories, trends,
-    product search) and removes the need for the user to complete the OAuth flow
-    before they can browse the dashboard.
+    This token is sufficient for read-only API calls (categories, trends,
+    highlights) and lets the dashboard work before the user completes OAuth.
 
     Returns:
-        str: The ``access_token`` string.
+        str: A valid ``access_token`` string (expires in ~6 hours).
 
     Raises:
-        ValueError: If APP_ID or SECRET_KEY are not configured.
+        ValueError: If ``APP_ID`` or ``SECRET_KEY`` are not configured.
         requests.HTTPError: If the token request fails.
     """
     if not APP_ID or not SECRET_KEY:
         raise ValueError(
             "APP_ID and SECRET_KEY must be set in your .env file."
         )
-
     payload = {
         "grant_type": "client_credentials",
         "client_id": APP_ID,
@@ -131,26 +130,25 @@ def get_app_token() -> str:
 
 
 def _auth_headers(access_token: Optional[str] = None) -> dict[str, str]:
-    """Build an Authorization header dict.
+    """Build an ``Authorization`` header dict.
 
-    Prefers the caller-supplied *access_token* (i.e. a user OAuth token).
-    When none is given, falls back to a freshly-minted app-level token so all
-    API calls work even before the user has authorised the app.
+    Prefers the caller-supplied *access_token* (user OAuth token). When none
+    is provided it falls back to a freshly minted app-level token so all API
+    calls succeed even before the user has gone through the OAuth flow.
 
     Args:
         access_token: Optional user-level OAuth access token.
 
     Returns:
-        dict[str, str]: ``{"Authorization": "Bearer <token>"}`` or ``{}`` if
-                        credentials are not configured.
+        dict[str, str]: ``{"Authorization": "Bearer <token>"}`` or ``{}``
+        when credentials are not configured (degrades gracefully).
     """
     token = access_token
     if not token:
         try:
             token = get_app_token()
         except Exception:  # noqa: BLE001
-            # Degrade gracefully — the caller will handle the 403 if it occurs.
-            return {}
+            return {}  # let the caller surface the 403 if it occurs
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -161,6 +159,8 @@ def _auth_headers(access_token: Optional[str] = None) -> dict[str, str]:
 
 def fetch_categories() -> list[dict]:
     """Fetch all top-level product categories for Brazil (MLB).
+
+    Uses the public endpoint that does **not** require authentication.
 
     Returns:
         list[dict]: A list of category objects, each containing at least
@@ -204,69 +204,120 @@ def fetch_trends(
     return response.json()
 
 
-def search_top_products_for_keyword(
-    keyword: str,
-    limit: int = 3,
+def fetch_category_highlights(
+    category_id: str,
     access_token: Optional[str] = None,
+    limit: int = 4,
 ) -> list[dict]:
-    """Search Mercado Livre for the top products matching *keyword*.
+    """Fetch the top best-seller products for a given MLB category.
 
-    Uses the public ``/sites/MLB/search`` endpoint sorted by relevance so the
-    results reflect actual popularity rather than price order.
+    Uses a three-step approach that works with an app-level token:
 
-    Each returned dict is a normalised subset of the full item payload:
+    1. **Highlights endpoint** — returns ordered best-seller catalog product
+       IDs for the category (``GET /highlights/MLB/category/{category_id}``).
+    2. **Product detail** — fetches name and high-res images for each ID
+       (``GET /products/{id}``).
+    3. **Product items** — fetches the cheapest live listing price
+       (``GET /products/{id}/items?limit=1``).
+
+    The product permalink is constructed from the canonical ML product-page
+    URL pattern: ``https://www.mercadolivre.com.br/p/{id}``.
+
+    Each returned dict is normalised to:
 
     .. code-block:: python
 
         {
-            "title":     str,   # product name
-            "price":     float, # price in BRL
-            "permalink": str,   # canonical product URL
-            "thumbnail": str,   # HTTPS image URL (replace http→https)
+            "title":     str,    # product name
+            "price":     float,  # lowest BRL price in the active listings
+            "permalink": str,    # canonical ML product page URL
+            "thumbnail": str,    # HTTPS high-res image URL
         }
 
     Args:
-        keyword:      The search term (e.g. a trending keyword).
-        limit:        Maximum number of products to return (1-50).
-        access_token: Optional OAuth token sent as a Bearer header.
+        category_id:  MLB category identifier (e.g. ``"MLB1051"``).
+        access_token: Optional user-level OAuth token; falls back to an
+                      app-level token when not provided.
+        limit:        Maximum number of products to return (1–20).
 
     Returns:
-        list[dict]: Up to *limit* product dicts. Empty list when the query
-                    returns no results.
+        list[dict]: Up to *limit* product dicts. Empty list when no
+                    highlights are available for the category.
 
     Raises:
-        requests.HTTPError:      On non-2xx API responses.
+        requests.HTTPError:       On non-2xx API responses.
         requests.ConnectionError: On network issues.
-        requests.Timeout:        If the request times out.
+        requests.Timeout:         If any request times out.
     """
-    url = f"{API_BASE_URL}/sites/MLB/search"
-    params: dict[str, str | int] = {
-        "q": keyword,
-        "sort": "relevance",
-        "limit": min(limit, 50),  # API hard-cap is 50
-    }
+    headers = _auth_headers(access_token)
 
-    response = requests.get(
-        url, params=params, headers=_auth_headers(access_token), timeout=15
-    )
-    response.raise_for_status()
+    # ── Step 1: fetch ordered highlight product IDs ───────────────────────────
+    highlights_url = f"{API_BASE_URL}/highlights/MLB/category/{category_id}"
+    h_resp = requests.get(highlights_url, headers=headers, timeout=15)
 
-    items: list[dict] = response.json().get("results", [])
+    if h_resp.status_code == 404:
+        return []  # category has no highlight data (e.g. real estate, services)
+    h_resp.raise_for_status()
 
+    content: list[dict] = h_resp.json().get("content", [])
+    if not content:
+        return []
+
+    prod_ids: list[str] = [
+        item["id"] for item in content[:limit] if item.get("id")
+    ]
+    if not prod_ids:
+        return []
+
+    # ── Steps 2 + 3: product detail + cheapest item price ────────────────────
     products: list[dict] = []
-    for item in items[:limit]:
-        # Ensure thumbnail is served over HTTPS (ML sometimes returns http://)
-        thumbnail: str = item.get("thumbnail", "")
-        if thumbnail.startswith("http://"):
-            thumbnail = "https://" + thumbnail[len("http://"):]
+    for prod_id in prod_ids:
+        try:
+            # Step 2 — product name & images
+            p_resp = requests.get(
+                f"{API_BASE_URL}/products/{prod_id}",
+                headers=headers,
+                timeout=15,
+            )
+            if not p_resp.ok:
+                continue
+            p_data: dict = p_resp.json()
 
-        products.append(
-            {
-                "title": item.get("title", ""),
-                "price": item.get("price", 0.0),
-                "permalink": item.get("permalink", ""),
-                "thumbnail": thumbnail,
-            }
-        )
+            name: str = p_data.get("name", "")
+            pictures: list[dict] = p_data.get("pictures") or []
+            image_url: str = (
+                pictures[0].get("url", "") if pictures else ""
+            )
+            # Normalise to HTTPS
+            if image_url.startswith("http://"):
+                image_url = "https://" + image_url[len("http://"):]
+
+            # Permalink: standard ML catalog product page
+            permalink: str = f"https://www.mercadolivre.com.br/p/{prod_id}"
+
+            # Step 3 — cheapest active item price
+            i_resp = requests.get(
+                f"{API_BASE_URL}/products/{prod_id}/items",
+                params={"limit": 1},
+                headers=headers,
+                timeout=15,
+            )
+            price: float = 0.0
+            if i_resp.ok:
+                items: list[dict] = i_resp.json().get("results", [])
+                if items:
+                    price = float(items[0].get("price") or 0)
+
+            products.append(
+                {
+                    "title": name,
+                    "price": price,
+                    "permalink": permalink,
+                    "thumbnail": image_url,
+                }
+            )
+        except Exception:  # noqa: BLE001
+            # Skip any individual product that fails; surface the rest
+            continue
 
     return products

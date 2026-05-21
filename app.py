@@ -289,79 +289,73 @@ with col_chart:
 
     st.bar_chart(chart_df, horizontal=True, use_container_width=True)
 
-# ── Deep Dive: Top Products ───────────────────────────────────────────────────
+# ── Deep Dive: Top Sellers ────────────────────────────────────────────────────
 st.divider()
-st.subheader("🛍️ Deep Dive: Top Products")
+st.subheader("🛍️ Deep Dive: Top Sellers")
 st.caption(
-    "Showing the most relevant products on Mercado Livre for each of the top trending keywords. "
-    "Prices in BRL · Cached for 15 minutes."
+    f"Best-selling products on Mercado Livre for **{selected_name}** · "
+    "Sourced from the Highlights API · Cached 15 min."
 )
 
-# How many trending keywords to enrich (top 5 at most)
-_ENRICH_TOP_N: int = 5
-top_keywords: list[str] = df_trends["keyword"].head(_ENRICH_TOP_N).tolist()
 
-
-@st.cache_data(ttl=900, show_spinner=False)  # 15-minute cache
-def fetch_products(keyword: str, access_token: str | None) -> list[dict]:
-    """Cached wrapper around :func:`meli_client.search_top_products_for_keyword`.
+@st.cache_data(ttl=900, show_spinner="Loading top sellers…")
+def load_highlights(category_id: str, access_token: str | None) -> list[dict]:
+    """Cached wrapper around :func:`meli_client.fetch_category_highlights`.
 
     Args:
-        keyword:      Trending search term to enrich.
-        access_token: Optional OAuth token.
+        category_id:  MLB category identifier.
+        access_token: Optional user OAuth token (falls back to app token).
 
     Returns:
-        list[dict]: Up to 3 product dicts with ``title``, ``price``,
-                    ``permalink``, and ``thumbnail`` keys.
+        list[dict]: Up to 4 product dicts (title, price, permalink, thumbnail).
     """
-    return mc.search_top_products_for_keyword(
-        keyword, limit=3, access_token=access_token
+    return mc.fetch_category_highlights(
+        category_id, access_token=access_token, limit=4
     )
 
 
-for kw in top_keywords:
-    with st.expander(f"🔍 Products for: **{kw}**", expanded=False):
-        with st.spinner(f"Searching for '{kw}'…"):
-            try:
-                products = fetch_products(kw, st.session_state.access_token)
-            except HTTPError as exc:
-                st.error(
-                    f"Search failed ({exc.response.status_code}): {exc.response.text}"
+try:
+    highlights = load_highlights(selected_id, st.session_state.access_token)
+except HTTPError as exc:
+    st.warning(
+        f"Could not load highlights ({exc.response.status_code}). "
+        "The Highlights API may not have data for this category yet."
+    )
+    highlights = []
+except Exception as exc:  # noqa: BLE001
+    st.warning(f"Unexpected error loading highlights: {exc}")
+    highlights = []
+
+if not highlights:
+    st.info(
+        "No best-seller data available for this category. "
+        "Try selecting a high-traffic category such as **Tecnologia** or **Moda**."
+    )
+else:
+    prod_cols = st.columns(len(highlights), gap="large")
+    for col, product in zip(prod_cols, highlights):
+        with col:
+            # ── Product image ────────────────────────────────────────────────
+            if product["thumbnail"]:
+                st.image(product["thumbnail"], use_container_width=True)
+
+            # ── Title (truncate at 72 chars to keep cards tidy) ──────────────
+            title: str = product["title"]
+            display_title = title if len(title) <= 72 else title[:69] + "…"
+            st.markdown(f"**{display_title}**")
+
+            # ── Price in BRL (Brazilian thousand/decimal separators) ──────────
+            price: float = product["price"]
+            # Python formats 1234567.89 as "1,234,567.89" → swap to "1.234.567,89"
+            brl = f"{price:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            st.markdown(f"💰 **R$ {brl}**")
+
+            # ── Permalink ────────────────────────────────────────────────────
+            if product["permalink"]:
+                st.markdown(
+                    f"[🛒 Ver no Mercado Livre]({product['permalink']})",
+                    unsafe_allow_html=False,
                 )
-                products = []
-            except Exception as exc:  # noqa: BLE001
-                st.error(f"Unexpected error: {exc}")
-                products = []
-
-        if not products:
-            st.info(f"No products found for **{kw}**. Try a different category.")
-        else:
-            cols = st.columns(len(products), gap="medium")
-            for col, product in zip(cols, products):
-                with col:
-                    # Thumbnail image
-                    if product["thumbnail"]:
-                        st.image(
-                            product["thumbnail"],
-                            use_container_width=True,
-                        )
-                    # Title (truncated to avoid overflowing cards)
-                    title = product["title"]
-                    display_title = title if len(title) <= 60 else title[:57] + "…"
-                    st.markdown(f"**{display_title}**")
-
-                    # Price formatted as BRL currency
-                    price: float = product["price"]
-                    st.markdown(
-                        f"💰 `R$ {price:,.2f}`".replace(",", "X")
-                        .replace(".", ",")
-                        .replace("X", ".")
-                    )
-
-                    # Clickable link to the product page
-                    permalink = product["permalink"]
-                    if permalink:
-                        st.markdown(f"[🛒 Ver no Mercado Livre]({permalink})")
 
 # ── Historical data ───────────────────────────────────────────────────────────
 st.divider()
