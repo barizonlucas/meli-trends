@@ -16,6 +16,7 @@ from urllib.parse import urlencode
 
 import requests
 from dotenv import load_dotenv
+from groq import Groq
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -30,6 +31,9 @@ REDIRECT_URI: str = os.getenv("REDIRECT_URI", "https://melitrends.bariza.dev")
 BASE_AUTH_URL: str = "https://auth.mercadolivre.com.br/authorization"
 TOKEN_URL: str = "https://api.mercadolibre.com/oauth/token"
 API_BASE_URL: str = "https://api.mercadolibre.com"
+
+GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 # ---------------------------------------------------------------------------
 # Auth helpers
@@ -226,6 +230,7 @@ def fetch_category_highlights(
     .. code-block:: python
 
         {
+            "id":        str,    # specific item ID for fetching reviews
             "title":     str,    # product name
             "price":     float,  # lowest BRL price in the active listings
             "permalink": str,    # canonical ML product page URL
@@ -300,13 +305,16 @@ def fetch_category_highlights(
                 timeout=15,
             )
             price: float = 0.0
+            item_id: str = ""
             if i_resp.ok:
                 items: list[dict] = i_resp.json().get("results", [])
                 if items:
                     price = float(items[0].get("price") or 0)
+                    item_id = items[0].get("item_id", "")
 
             products.append(
                 {
+                    "id": item_id,
                     "title": name,
                     "price": price,
                     "permalink": permalink,
@@ -318,3 +326,41 @@ def fetch_category_highlights(
             continue
 
     return products
+
+
+def fetch_item_reviews(item_id: str, access_token: Optional[str] = None) -> list[str]:
+    """Fetch top reviews for a specific item using ML API."""
+    if not item_id:
+        return []
+    url = f"{API_BASE_URL}/reviews/item/{item_id}"
+    response = requests.get(url, headers=_auth_headers(access_token), timeout=15)
+    if response.status_code == 404:
+        return []
+    response.raise_for_status()
+    reviews_data = response.json().get("reviews", [])
+    return [rev.get("content", "") for rev in reviews_data if rev.get("content")]
+
+
+def generate_ai_insight(reviews: list[str]) -> str:
+    """Generate AI insight from reviews using Groq."""
+    if not groq_client:
+        return "⚠️ GROQ_API_KEY not configured in .env."
+    if not reviews:
+        return "⚠️ No reviews available for this product."
+    
+    prompt = (
+        "Analyze the following user reviews for a product and summarize the 3 biggest pain points "
+        "and 3 biggest strengths. Keep the response to 3 short bullet points for pain points and 3 for strengths.\n\n"
+        "Reviews:\n" + "\\n".join(f"- {r}" for r in reviews[:20])
+    )
+    
+    try:
+        completion = groq_client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama3-8b-8192",
+            temperature=0.3,
+            max_tokens=500,
+        )
+        return completion.choices[0].message.content or "⚠️ Empty response from AI."
+    except Exception as e:
+        return f"⚠️ AI Analysis failed: {e}"

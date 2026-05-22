@@ -72,6 +72,12 @@ LANG_DICT: dict[str, dict[str, str]] = {
         "tooltip_ranking":        "Visualize a intensidade do interesse: entenda a concentração de mercado. Ideal para priorizar palavras-chave em estratégias de SEO e anúncios.",
         "tooltip_top_sellers":    "Benchmark competitivo: analise líderes de vendas. Compare posicionamento e otimize suas listagens para maior conversão.",
         "tooltip_history":        "Valide padrões ao longo do tempo: detecte sazonalidade e tendências de longo prazo para embasar previsões e estoque.",
+        # AI Insights
+        "ai_button":              "✨ AI Insights",
+        "ai_loading":             "Analisando avaliações...",
+        "ai_strengths":           "✅ Pontos Fortes",
+        "ai_pain_points":         "❌ Pontos Fracos",
+        "ai_no_reviews":          "Nenhuma avaliação disponível para este produto.",
     },
     "EN": {
         # Sidebar
@@ -122,6 +128,12 @@ LANG_DICT: dict[str, dict[str, str]] = {
         "tooltip_ranking":        "Visualize interest intensity: understand market concentration. Ideal for prioritizing keywords in your SEO and ad strategies.",
         "tooltip_top_sellers":    "Competitive benchmarking: analyze top-selling products. Compare positioning and optimize your own listings for higher conversion.",
         "tooltip_history":        "Validate patterns over time: detect seasonality and long-term trends to support better forecasting and inventory decisions.",
+        # AI Insights
+        "ai_button":              "✨ AI Insights",
+        "ai_loading":             "Analyzing reviews...",
+        "ai_strengths":           "✅ Strengths",
+        "ai_pain_points":         "❌ Pain Points",
+        "ai_no_reviews":          "No reviews available for this product.",
     },
 }
 
@@ -161,6 +173,9 @@ if "access_token" not in st.session_state:
 
 if "token_info" not in st.session_state:
     st.session_state.token_info = {}
+
+if "insights" not in st.session_state:
+    st.session_state.insights = {}
 
 # ---------------------------------------------------------------------------
 # Sidebar — Authentication
@@ -486,6 +501,32 @@ else:
                         f"[{T['sellers_link']}]({product['permalink']})",
                         unsafe_allow_html=False,
                     )
+                
+                # ── AI Insights ──────────────────────────────────────────────────
+                item_id = product.get("id")
+                if item_id:
+                    if st.button(T["ai_button"], key=f"ai_{item_id}", use_container_width=True):
+                        if item_id not in st.session_state.insights:
+                            with st.spinner(T["ai_loading"]):
+                                # 1. Check DB cache
+                                insight = db.get_item_insight(item_id)
+                                if not insight:
+                                    # 2. Fetch reviews from ML API
+                                    revs = mc.fetch_item_reviews(item_id, st.session_state.access_token)
+                                    if not revs:
+                                        insight = T["ai_no_reviews"]
+                                    else:
+                                        # 3. Generate with Groq
+                                        insight = mc.generate_ai_insight(revs)
+                                    # 4. Save to DB cache
+                                    db.save_item_insight(item_id, insight)
+                                
+                                st.session_state.insights[item_id] = insight
+                    
+                    # Display insight if loaded
+                    if item_id in st.session_state.insights:
+                        with st.container(border=True):
+                            st.markdown(st.session_state.insights[item_id])
 
 # ── Historical data ───────────────────────────────────────────────────────────
 st.divider()

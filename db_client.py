@@ -14,7 +14,7 @@ Responsibilities:
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 import pandas as pd
@@ -79,6 +79,29 @@ class TrendHistory(Base):
             f"<TrendHistory id={self.id} category={self.category_id!r} "
             f"keyword={self.keyword!r} rank={self.rank} at={self.created_at}>"
         )
+
+
+class ItemInsight(Base):
+    """ORM model for caching AI insights for products.
+
+    Columns:
+        item_id:    Mercado Livre Item ID (e.g., \"MLB123456\"). Primary Key.
+        insights:   The generated markdown insights text.
+        created_at: UTC timestamp of generation. Used for 24h TTL.
+    """
+
+    __tablename__ = "item_insight"
+
+    item_id: str = Column(String(64), primary_key=True)
+    insights: str = Column(String, nullable=False)
+    created_at: datetime = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<ItemInsight item_id={self.item_id!r} at={self.created_at}>"
 
 
 # ---------------------------------------------------------------------------
@@ -273,3 +296,46 @@ def get_keyword_rank_over_time(
         .sort_values("created_at")
         .reset_index(drop=True)
     )
+
+
+def get_item_insight(item_id: str) -> Optional[str]:
+    """Retrieve unexpired AI insight for an item.
+    
+    Returns the insight markdown string if it exists and is younger than 24 hours.
+    Otherwise returns None.
+    """
+    stmt = select(ItemInsight).where(ItemInsight.item_id == item_id)
+    SessionLocal = _get_session_factory()
+    with SessionLocal() as session:
+        insight = session.execute(stmt).scalar_one_or_none()
+    
+    if insight:
+        age = datetime.now(timezone.utc) - insight.created_at
+        if age <= timedelta(hours=24):
+            return insight.insights
+    return None
+
+
+def save_item_insight(item_id: str, insights: str) -> None:
+    """Save or update an AI insight for an item."""
+    SessionLocal = _get_session_factory()
+    with SessionLocal() as session:
+        try:
+            insight = session.execute(
+                select(ItemInsight).where(ItemInsight.item_id == item_id)
+            ).scalar_one_or_none()
+            
+            if insight:
+                insight.insights = insights
+                insight.created_at = datetime.now(timezone.utc)
+            else:
+                insight = ItemInsight(
+                    item_id=item_id,
+                    insights=insights,
+                    created_at=datetime.now(timezone.utc),
+                )
+                session.add(insight)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
