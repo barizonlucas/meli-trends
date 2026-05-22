@@ -357,7 +357,7 @@ def generate_ai_insight(reviews: list[str]) -> str:
     try:
         completion = groq_client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama3-8b-instant",
+            model="llama-3.1-8b-instant",
             temperature=0.3,
             max_tokens=500,
         )
