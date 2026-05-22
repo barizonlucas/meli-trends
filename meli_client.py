@@ -341,12 +341,13 @@ def fetch_item_reviews(item_id: str, access_token: Optional[str] = None) -> list
     return [rev.get("content", "") for rev in reviews_data if rev.get("content")]
 
 
-def generate_ai_insight(reviews: list[str]) -> str:
+def generate_ai_insight(reviews: list[str]) -> Optional[str]:
     """Generate AI insight from reviews using Groq."""
     if not groq_client:
-        return "⚠️ GROQ_API_KEY not configured in .env."
+        print("⚠️ GROQ_API_KEY not configured in .env.")
+        return None
     if not reviews:
-        return "⚠️ No reviews available for this product."
+        return None
     
     prompt = (
         "Analyze the following user reviews for a product and summarize the 3 biggest pain points "
@@ -361,6 +362,7 @@ def generate_ai_insight(reviews: list[str]) -> str:
             temperature=0.3,
             max_tokens=500,
         )
-        return completion.choices[0].message.content or "⚠️ Empty response from AI."
+        return completion.choices[0].message.content
     except Exception as e:
-        return f"⚠️ AI Analysis failed: {e}"
+        print(f"⚠️ AI Analysis failed: {e}")
+        return None

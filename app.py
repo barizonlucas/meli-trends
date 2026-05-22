@@ -515,13 +515,19 @@ else:
                                     revs = mc.fetch_item_reviews(item_id, st.session_state.access_token)
                                     if not revs:
                                         insight = T["ai_no_reviews"]
+                                        db.save_item_insight(item_id, insight)
+                                        st.session_state.insights[item_id] = insight
                                     else:
                                         # 3. Generate with Groq
                                         insight = mc.generate_ai_insight(revs)
-                                    # 4. Save to DB cache
-                                    db.save_item_insight(item_id, insight)
-                                
-                                st.session_state.insights[item_id] = insight
+                                        if insight is not None:
+                                            # 4. Save to DB cache
+                                            db.save_item_insight(item_id, insight)
+                                            st.session_state.insights[item_id] = insight
+                                        else:
+                                            st.error("Failed to generate AI insight." if lang == "EN" else "Falha ao gerar insight da IA.")
+                                else:
+                                    st.session_state.insights[item_id] = insight
                     
                     # Display insight if loaded
                     if item_id in st.session_state.insights:
