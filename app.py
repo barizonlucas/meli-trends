@@ -473,17 +473,16 @@ except Exception as exc:  # noqa: BLE001
 if not highlights:
     st.info(T["sellers_no_data"])
 else:
-    # ── Display grid (5 items per row) ────────────────────────────────────────
-    items_per_row = 5
-    for i in range(0, len(highlights), items_per_row):
-        row_highlights = highlights[i : i + items_per_row]
-        cols = st.columns(items_per_row, gap="large")
-        for col, product in zip(cols, row_highlights):
-            with col:
+    # ── Display List View ────────────────────────────────────────────────────
+    for product in highlights:
+        with st.container():
+            col1, col2 = st.columns([1, 3], gap="large")
+            with col1:
                 # ── Product image (CSS ensures uniform 200px height) ──────────────
                 if product["thumbnail"]:
                     st.image(product["thumbnail"], use_container_width=True)
 
+            with col2:
                 # ── Title (truncate at 72 chars to keep cards tidy) ──────────────
                 title: str = product["title"]
                 display_title = title if len(title) <= 72 else title[:69] + "…"
@@ -505,7 +504,7 @@ else:
                 # ── AI Insights ──────────────────────────────────────────────────
                 item_id = product.get("id")
                 if item_id:
-                    if st.button(T["ai_button"], key=f"ai_{item_id}", use_container_width=True):
+                    if st.button(T["ai_button"], key=f"ai_{item_id}"):
                         if item_id not in st.session_state.insights:
                             with st.spinner(T["ai_loading"]):
                                 # 1. Check DB cache
@@ -533,6 +532,7 @@ else:
                     if item_id in st.session_state.insights:
                         with st.container(border=True):
                             st.markdown(st.session_state.insights[item_id])
+        st.divider()
 
 # ── Historical data ───────────────────────────────────────────────────────────
 st.divider()

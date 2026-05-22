@@ -350,9 +350,8 @@ def generate_ai_insight(reviews: list[str]) -> Optional[str]:
         return None
     
     prompt = (
-        "Analyze the following user reviews for a product and summarize the 3 biggest pain points "
-        "and 3 biggest strengths. Keep the response to 3 short bullet points for pain points and 3 for strengths.\n\n"
-        "Reviews:\n" + "\\n".join(f"- {r}" for r in reviews[:20])
+        "Você é um analista de e-commerce. Analise as seguintes avaliações de usuários e resuma os 3 maiores pontos de dor (Pain Points) e os 3 maiores pontos fortes (Strengths). Responda OBRIGATORIAMENTE em Português do Brasil (PT-BR), sendo direto e conciso, usando bullet points.\n\n"
+        "Avaliações:\n" + "\\n".join(f"- {r}" for r in reviews[:20])
     )
     
     try:
