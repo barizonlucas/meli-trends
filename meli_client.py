@@ -205,7 +205,7 @@ def fetch_trends(
 def fetch_category_highlights(
     category_id: str,
     access_token: Optional[str] = None,
-    limit: int = 4,
+    limit: int = 10,
 ) -> list[dict]:
     """Fetch the top best-seller products for a given MLB category.
 

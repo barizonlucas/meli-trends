@@ -436,10 +436,10 @@ def load_highlights(category_id: str, access_token: str | None) -> list[dict]:
         access_token: Optional user OAuth token (falls back to app token).
 
     Returns:
-        list[dict]: Up to 4 product dicts (title, price, permalink, thumbnail).
+        list[dict]: Up to 10 product dicts (title, price, permalink, thumbnail).
     """
     return mc.fetch_category_highlights(
-        category_id, access_token=access_token, limit=4
+        category_id, access_token=access_token, limit=10
     )
 
 
@@ -458,30 +458,34 @@ except Exception as exc:  # noqa: BLE001
 if not highlights:
     st.info(T["sellers_no_data"])
 else:
-    prod_cols = st.columns(len(highlights), gap="large")
-    for col, product in zip(prod_cols, highlights):
-        with col:
-            # ── Product image (CSS ensures uniform 200px height) ──────────────
-            if product["thumbnail"]:
-                st.image(product["thumbnail"], use_container_width=True)
+    # ── Display grid (5 items per row) ────────────────────────────────────────
+    items_per_row = 5
+    for i in range(0, len(highlights), items_per_row):
+        row_highlights = highlights[i : i + items_per_row]
+        cols = st.columns(items_per_row, gap="large")
+        for col, product in zip(cols, row_highlights):
+            with col:
+                # ── Product image (CSS ensures uniform 200px height) ──────────────
+                if product["thumbnail"]:
+                    st.image(product["thumbnail"], use_container_width=True)
 
-            # ── Title (truncate at 72 chars to keep cards tidy) ──────────────
-            title: str = product["title"]
-            display_title = title if len(title) <= 72 else title[:69] + "…"
-            st.markdown(f"**{display_title}**")
+                # ── Title (truncate at 72 chars to keep cards tidy) ──────────────
+                title: str = product["title"]
+                display_title = title if len(title) <= 72 else title[:69] + "…"
+                st.markdown(f"**{display_title}**")
 
-            # ── Price in BRL (Brazilian thousand/decimal separators) ──────────
-            price: float = product["price"]
-            # Python formats 1234567.89 as "1,234,567.89" → swap to "1.234.567,89"
-            brl = f"{price:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-            st.markdown(f"💰 **R$ {brl}**")
+                # ── Price in BRL (Brazilian thousand/decimal separators) ──────────
+                price: float = product["price"]
+                # Python formats 1234567.89 as "1,234,567.89" → swap to "1.234.567,89"
+                brl = f"{price:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                st.markdown(f"💰 **R$ {brl}**")
 
-            # ── Permalink ────────────────────────────────────────────────────
-            if product["permalink"]:
-                st.markdown(
-                    f"[{T['sellers_link']}]({product['permalink']})",
-                    unsafe_allow_html=False,
-                )
+                # ── Permalink ────────────────────────────────────────────────────
+                if product["permalink"]:
+                    st.markdown(
+                        f"[{T['sellers_link']}]({product['permalink']})",
+                        unsafe_allow_html=False,
+                    )
 
 # ── Historical data ───────────────────────────────────────────────────────────
 st.divider()
